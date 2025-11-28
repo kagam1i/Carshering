@@ -85,7 +85,7 @@ app.post('/api/authorization', (req, res) => {
 
 // создать машину
 app.post("/api/cars", (req, res) => {
-    const { model, number, is_available = 1 } = req.body;
+    const { model, number, is_available = 1, price_per_hour } = req.body;
 
     if (!model) {
         return res.status(400).json({ error: "Введите марку машины" });
@@ -95,15 +95,23 @@ app.post("/api/cars", (req, res) => {
         return res.status(400).json({ error: "Введите номер машины" });
     }
 
+    if (price_per_hour == null) {
+        return res.status(400).json({ error: "Укажите стоимость аренды за час" });
+    }
+
+    const price = Number(price_per_hour);
+    if (Number.isNaN(price) || price <= 0) {
+        return res.status(400).json({ error: "Стоимость за час должна быть положительным числом" });
+    }
+
     db.run(
-        "INSERT INTO cars (model, number, is_available) VALUES (?, ?, ?)",
-        [model, number, is_available ? 1 : 0],
+        "INSERT INTO cars (model, number, is_available, price_per_hour) VALUES (?, ?, ?, ?)",
+        [model, number, is_available ? 1 : 0, price],
         function (err) {
             if (err) {
                 console.error("INSERT cars error:", err);
 
                 if (err.code === "SQLITE_CONSTRAINT") {
-
                     return res.status(400).json({ error: "Машина с таким номером уже существует" });
                 }
 
@@ -115,11 +123,12 @@ app.post("/api/cars", (req, res) => {
                 model,
                 number,
                 is_available: is_available ? 1 : 0,
+                // >>> ДОБАВЛЕНО: возвращаем цену за час в ответе
+                price_per_hour: price,
             });
         }
     );
 });
-
 
 // вывод списка машин
 app.get("/api/cars", (req, res) => {
@@ -266,7 +275,8 @@ db.serialize(() => {
       car_id INTEGER PRIMARY KEY AUTOINCREMENT,
       model TEXT NOT NULL,
       number TEXT NOT NULL UNIQUE,
-      is_available INTEGER NOT NULL DEFAULT 1
+      is_available INTEGER NOT NULL DEFAULT 1,
+      price_per_hour REAL NOT NULL
     )
   `);
 
